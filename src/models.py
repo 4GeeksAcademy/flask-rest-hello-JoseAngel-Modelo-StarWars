@@ -37,7 +37,14 @@ class Planet(db.Model):
     id: Mapped[int] = mapped_column(primary_key=True)
     name:Mapped[str] = mapped_column(String(120))
 
-    characters = db.relationship("Charater", back_populates = "homeworld")
+    characters = db.relationship("Character", back_populates = "homeworld")
+    favorites = db.relationship("Favorite", back_populates = "planet")
+
+    def serialize(self):
+        return {
+            "id": self.id,
+            "name": self.name
+        }
     
 class Character(db.Model):
     __tablename__ = "characters"
@@ -46,9 +53,10 @@ class Character(db.Model):
     name: Mapped[str] = mapped_column(String(120), unique=True)
     planet_id: Mapped [int] = mapped_column (ForeignKey("planets.id"), nullable=False)
 
-    homeworld = db.relationship("planets", back_populates = "characters")
+    homeworld = db.relationship("Planet", back_populates = "characters")
 
     films: Mapped[List["Film"]] = db.relationship(
+        "Film",
         secondary=character_films,
         back_populates="characters",
     )
@@ -73,6 +81,7 @@ class Film(db.Model):
     title: Mapped[str] = mapped_column(String(200), unique=True)
 
     characters: Mapped[List["Character"]] = db.relationship(
+        "Character",
         secondary=character_films,
         back_populates="films",
     )
@@ -85,9 +94,23 @@ class Film(db.Model):
 class Favorite(db.Model):
     __tablename__ = "favorites"
 
-    user_id: Mapped[int] = mapped_column( ForeignKey("users.id"),primary_key = True)
-    character_id: Mapped[int] = mapped_column (ForeignKey("characters.id"), primary_key = True)
-    note: Mapped [str] = mapped_column (String(255))
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    
+    character_id: Mapped[int] = mapped_column(ForeignKey("characters.id"), nullable=True)
+    planet_id: Mapped[int] = mapped_column(ForeignKey("planets.id"), nullable=True)
+    
+    note: Mapped[str] = mapped_column(String(255), nullable=True)
 
     user = db.relationship("User", back_populates="favorites")
     character = db.relationship("Character", back_populates="favorites")
+    planet = db.relationship("Planet", back_populates = "favorites")
+
+    def serialize(self):
+        return {
+            "id": self.id,
+            "user_id": self.user_id,
+            "character_id": self.character_id,
+            "planet_id": self.planet_id,
+            "note": self.note
+        }
