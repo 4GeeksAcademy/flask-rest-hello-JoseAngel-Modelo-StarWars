@@ -1,97 +1,118 @@
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import String, Boolean, ForeignKey
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column
 from typing import List
 
-db = SQLAlchemy()
+# ✅ Buen uso de SQLAlchemy para definir modelos
 
+# Tabla intermedia para la relación entre personajes y películas
+character_films = db.Table(
+    "character_films",
+    db.Column("character_id", ForeignKey("characters.id"), primary_key=True),
+    db.Column("film_id", ForeignKey("films.id"), primary_key=True),
+)
 
 class User(db.Model):
-    __tablename__ = 'user'
-    id: Mapped[int] = mapped_column(primary_key=True)
-    user_name: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
-    first_name: Mapped[str] = mapped_column(String(120), nullable=False)
-    last_name: Mapped[str] = mapped_column(String(120), nullable=False)
-    email: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
-    password: Mapped[str] = mapped_column(String(80), nullable=False)
-    is_active: Mapped[bool] = mapped_column(Boolean(), nullable=False)
-    # Relaciones basicas
-    posts: Mapped[List["Post"]] = relationship(back_populates="author")
-    comments: Mapped[List["Comment"]] = relationship(back_populates="author")
-    #  Relaciones de seguimiento
-    followers: Mapped[List["Follower"]] = relationship(back_populates="user_to", foreign_keys="Follower.user_to_id")
-    following: Mapped[List["Follower"]] = relationship(back_populates="user_from", foreign_keys="Follower.user_from_id")
+    __tablename__ = "users"  # 📝 Cambié el nombre de la tabla a plural para seguir la convención
+
+    id: Mapped[int] = mapped_column(primary_key=True)  # ✅ Buen uso de Mapped
+    email: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)  # ✅ Buen uso de restricciones
+    password: Mapped[str] = mapped_column(nullable=False)  # 🔧 Añadir tipo de datos para mayor claridad
+    is_active: Mapped[bool] = mapped_column(Boolean(), nullable=False)  # ✅ Buen uso de Boolean
+
+    favorites = db.relationship(
+        "Favorite",
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )  # ✅ Buen uso de relaciones
 
     def serialize(self):
         return {
             "id": self.id,
             "email": self.email,
-            "username": self.user_name,
-            "firstname": self.first_name,
-            "lastname": self.last_name,
+            "is_active": self.is_active,
+            # do not serialize the password, its a security breach
         }
 
+class Planet(db.Model):
+    __tablename__ = "planets"  # 📝 Cambié el nombre de la tabla a plural
+    id: Mapped[int] = mapped_column(primary_key=True)  # ✅ Buen uso de Mapped
+    name: Mapped[str] = mapped_column(String(120))  # ✅ Buen uso de Mapped
 
-class Post(db.Model):
-    __tablename__ = 'post'
-    id: Mapped[int] = mapped_column(primary_key=True)
-    # Relaciones basicas
-    user_id: Mapped[int] = mapped_column(ForeignKey("user.id"), nullable=False)
-    author: Mapped["User"] = relationship(back_populates="posts")
-    media: Mapped[List["Media"]] = relationship(back_populates="post")
-    comments: Mapped[List["Comment"]] = relationship(back_populates="post")
+    characters = db.relationship("Character", back_populates="homeworld")  # ✅ Buen uso de relaciones
+    favorites = db.relationship("Favorite", back_populates="planet")  # ✅ Buen uso de relaciones
 
     def serialize(self):
         return {
             "id": self.id,
-            "user_id": self.user_id
+            "name": self.name
         }
+    
+class Character(db.Model):
+    __tablename__ = "characters"  # 📝 Cambié el nombre de la tabla a plural
+    
+    id: Mapped[int] = mapped_column(primary_key=True)  # ✅ Buen uso de Mapped
+    name: Mapped[str] = mapped_column(String(120), unique=True)  # ✅ Buen uso de restricciones
+    planet_id: Mapped[int] = mapped_column(ForeignKey("planets.id"), nullable=False)  # ✅ Buen uso de ForeignKey
 
+    homeworld = db.relationship("Planet", back_populates="characters")  # ✅ Buen uso de relaciones
 
-class Media(db.Model):
-    __tablename__ = 'media'
-    id: Mapped[int] = mapped_column(primary_key=True)
-    type: Mapped[str] = mapped_column(String(50), nullable=False)
-    url: Mapped[str] = mapped_column(String(120), nullable=False)
-    # Relaciones basicas
-    post_id: Mapped[int] = mapped_column(ForeignKey("post.id"), nullable=False)
-    post: Mapped["Post"] = relationship(back_populates="media")
+    films: Mapped[List["Film"]] = db.relationship(
+        "Film",
+        secondary=character_films,
+        back_populates="characters",
+    )  # ✅ Buen uso de relaciones
+
+    favorites = db.relationship(
+        "Favorite",
+        back_populates="character",
+        cascade="all, delete-orphan",
+    )  # ✅ Buen uso de relaciones
 
     def serialize(self):
         return {
             "id": self.id,
-            "type": self.type,
-            "url": self.url,
+            "name": self.name,
+            "planet_id": self.planet_id
         }
 
-class Comment(db.Model):
-    __tablename__ = 'comment'
-    id: Mapped[int] = mapped_column(primary_key=True)
-    comment_text: Mapped[str] = mapped_column(String(500), nullable=False)
-    # Relaciones basicas
-    author_id: Mapped[int] = mapped_column(ForeignKey("user.id"), nullable=False)
-    post_id: Mapped[int] = mapped_column(ForeignKey("post.id"), nullable=False)
-    author: Mapped["User"] = relationship(back_populates="comments")
-    post: Mapped["Post"] = relationship(back_populates="comments")
+class Film(db.Model):
+    __tablename__ = "films"  # 📝 Cambié el nombre de la tabla a plural
+    
+    id: Mapped[int] = mapped_column(primary_key=True)  # ✅ Buen uso de Mapped
+    title: Mapped[str] = mapped_column(String(200), unique=True)  # ✅ Buen uso de restricciones
 
+    characters: Mapped[List["Character"]] = db.relationship(
+        "Character",
+        secondary=character_films,
+        back_populates="films",
+    )  # ✅ Buen uso de relaciones
     def serialize(self):
         return {
-                "id": self.id,
-                "comment_text": self.comment_text
+            "id": self.id,
+            "title": self.title
         }
 
-class Follower(db.Model):
-    __tablename__ = 'follower'
-    id: Mapped[int] = mapped_column(primary_key=True)
-    # Relaciones de seguimiento
-    user_from_id: Mapped[int] = mapped_column(ForeignKey("user.id"), nullable=False)
-    user_to_id: Mapped[int] = mapped_column(ForeignKey("user.id"), nullable=False)
-    user_from: Mapped["User"] = relationship(back_populates="following", foreign_keys=[user_from_id])
-    user_to: Mapped["User"] = relationship(back_populates="followers", foreign_keys=[user_to_id])
+class Favorite(db.Model):
+    __tablename__ = "favorites"  # 📝 Cambié el nombre de la tabla a plural
+
+    id: Mapped[int] = mapped_column(primary_key=True)  # ✅ Buen uso de Mapped
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)  # ✅ Buen uso de ForeignKey
+    
+    character_id: Mapped[int] = mapped_column(ForeignKey("characters.id"), nullable=True)  # ✅ Buen uso de ForeignKey
+    planet_id: Mapped[int] = mapped_column(ForeignKey("planets.id"), nullable=True)  # ✅ Buen uso de ForeignKey
+    
+    note: Mapped[str] = mapped_column(String(255), nullable=True)  # ✅ Buen uso de Mapped
+
+    user = db.relationship("User", back_populates="favorites")  # ✅ Buen uso de relaciones
+    character = db.relationship("Character", back_populates="favorites")  # ✅ Buen uso de relaciones
+    planet = db.relationship("Planet", back_populates="favorites")  # ✅ Buen uso de relaciones
 
     def serialize(self):
         return {
             "id": self.id,
-            "user_from_id": self.user_from_id,
-            "user_to_id": self.user_to_id,
+            "user_id": self.user_id,
+            "character_id": self.character_id,
+            "planet_id": self.planet_id,
+            "note": self.note
         }
